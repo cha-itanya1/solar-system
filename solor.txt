@@ -1,0 +1,93 @@
+#include <Servo.h>
+
+Servo servo1;        
+Servo servo2;         
+Servo wiperServo;   
+int ldrTop = A0;
+int ldrBottom = A1;
+int relayPin = 7;      
+int wiperPin = 6;    
+int threshold = 30;
+int pos1 = 40;
+int pos2 = 40;
+int wiperStart = 0;
+int wiperEnd = 120;
+
+
+unsigned long cleanInterval = 60L * 1000L;
+unsigned long lastCleanTime = 0;
+bool isCleaning = false;
+
+void setup() {
+  Serial.begin(9600);
+
+  servo1.attach(9);
+  servo2.attach(10);
+  wiperServo.attach(wiperPin);
+
+  servo1.write(pos1);
+  servo2.write(pos2);
+
+  pinMode(relayPin, OUTPUT);
+  digitalWrite(relayPin, LOW); // Initially OFF
+
+  delay(500);
+}
+
+void loop() {
+  int topValue = analogRead(ldrTop);
+  int bottomValue = analogRead(ldrBottom);
+  int difference = topValue - bottomValue;
+
+  Serial.print("Top: "); Serial.print(topValue);
+  Serial.print(" | Bottom: "); Serial.print(bottomValue);
+  Serial.print(" | Diff: "); Serial.println(difference);
+
+  if (difference > threshold) {
+    if (pos1 < 100) pos1++;
+    if (pos2 < 100) pos2++;
+  } else if (difference < -threshold) {
+    if (pos1 > 0) pos1--;
+    if (pos2 > 0) pos2--;
+  }
+
+  servo1.write(pos1);
+  servo2.write(pos2);
+
+ 
+  unsigned long currentTime = millis();
+  if (currentTime - lastCleanTime >= cleanInterval && !isCleaning) {
+    isCleaning = true;
+    Serial.println("Cleaning started...");
+
+    
+    digitalWrite(relayPin, HIGH);
+    Serial.println(" Pump ON");
+    delay(10000); // Pump ON for 10 seconds
+
+    
+    digitalWrite(relayPin, LOW);
+    Serial.println("Pump OFF");
+
+    Serial.println(" Wiper started...");
+    unsigned long wipeStartTime = millis();
+    while (millis() - wipeStartTime <= 20000) {
+      for (int angle = wiperStart; angle <= wiperEnd; angle += 2) {
+        wiperServo.write(180 - angle);
+        delay(15);
+      }
+      for (int angle = wiperEnd; angle >= wiperStart; angle -= 2) {
+        wiperServo.write(180 - angle);
+        delay(15);
+      }
+    }
+
+    Serial.println(" Cleaning Complete.");
+    lastCleanTime = currentTime;
+    isCleaning = false;
+  }
+
+  delay(300);
+}
+
+
